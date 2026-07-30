@@ -443,6 +443,13 @@ class SyncEngine {
     resetLevel() {
         this.positionX = 0;
         this.lastRenderedPositionX = null; // Force render on next frame
+        
+        // Reset camera / game world translation
+        const gameWorld = document.getElementById('game-world');
+        if (gameWorld) {
+            gameWorld.style.transform = 'translate3d(0, 0, 0)';
+        }
+        
         this.lastTime = 0;
         this.currentBlock = null;
         this.lastGapChecked = null;
@@ -574,14 +581,14 @@ class SyncEngine {
         // Camera follows character
         // We want the character to remain roughly slightly to the left of the center of screen.
         const targetScroll = this.positionX - (this.gameContainer.clientWidth * 0.2);
+        const scrollX = targetScroll > 0 ? targetScroll : 0;
         
-        if (targetScroll > 0) {
-            this.gameContainer.scrollLeft = targetScroll;
-        } else {
-            this.gameContainer.scrollLeft = 0;
+        // Translate the entire #game-world container instead of scrolling the container physically,
+        // which gives fluid, sub-pixel, jitter-free GPU camera scrolling
+        const gameWorld = document.getElementById('game-world');
+        if (gameWorld) {
+            gameWorld.style.transform = `translate3d(${-scrollX}px, 0, 0)`;
         }
-
-        // Parallax scrolling layers kept static to avoid dynamic vector image rasterization on low-end systems
     }
 }
 

@@ -42,25 +42,8 @@ html {
     width: 100vw;
     height: 100vh;
     background: linear-gradient(to bottom, #7cd1f9 0%, #bce6ff 45%, #ffd3b6 75%, #ffb7b2 100%);
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden; /* Hide scrollbar completely for liquid-smooth GPU scrolling */
     position: relative;
-    /* Custom Scrollbar */
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-cyan) transparent;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Webkit scrollbar for premium look */
-.game-container::-webkit-scrollbar {
-    height: 6px;
-    background-color: rgba(255, 255, 255, 0.15);
-}
-
-.game-container::-webkit-scrollbar-thumb {
-    background-color: var(--color-cyan);
-    border-radius: 4px;
-    box-shadow: 0 0 10px rgba(43, 203, 186, 0.5);
 }
 
 /* Ambient Vignette - Light soft vignette for sky aesthetic */
@@ -82,6 +65,7 @@ html {
     height: 100%;
     position: relative;
     background: transparent;
+    will-change: transform; /* Promote entire game world to GPU composited layer for stutter-free scrolling */
 }
 
 /* -----------------------------
@@ -455,6 +439,7 @@ body.failed .game-container {
 
 .bridge-segment {
     position: absolute;
+    top: 0;
     height: 100%;
 }
 
@@ -468,7 +453,6 @@ body.failed .game-container {
     border-top: 4px solid #5c2d0c;
     border-bottom: 4px solid #3d1e08;
     box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.15), 0 4px 6px rgba(0, 0, 0, 0.15);
-    position: relative;
 }
 
 /* Repeating rope railing & wooden posts every 100px (1 Beat) */
@@ -489,7 +473,6 @@ body.failed .game-container {
     background-color: rgba(255, 255, 255, 0.05);
     /* very soft guide gap */
     border-bottom: 2px dashed #8b5a2b;
-    position: relative;
     display: flex;
     /* So dropped blocks align naturally left */
     align-items: flex-end;
