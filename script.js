@@ -415,7 +415,8 @@ class SyncEngine {
             
             const seg = document.createElement('div');
             seg.className = `bridge-segment ${type}`;
-            seg.style.flex = `0 0 ${width}px`;
+            seg.style.left = `${lastX}px`;
+            seg.style.width = `${width}px`;
             bridgeContainer.appendChild(seg);
             
             if (type === 'gap') {
@@ -423,6 +424,14 @@ class SyncEngine {
             }
             
             lastX += width;
+        }
+        
+        // Garbage collect old off-screen DOM nodes from the bridge container to keep browser memory usage constant
+        const children = Array.from(bridgeContainer.children);
+        for (let seg of children) {
+            if (seg.offsetLeft + seg.offsetWidth < this.positionX - 800) {
+                seg.remove();
+            }
         }
         
         // Dynamically expand the scrollable game world container width
@@ -554,38 +563,12 @@ class SyncEngine {
         }
         this.lastRenderedPositionX = this.positionX;
 
-        // Move character using hardware-accelerated transform
-        if (this.player) {
-            this.player.style.transform = `translateX(${this.positionX}px)`;
-        }
+        // Combine horizontal movement and vertical bounce into a single parent translate3d to avoid layout thrashing
+        const bounce = this.state === 'WALK' ? Math.abs(Math.sin((this.positionX / RHYTHM_CONFIG.BEAT_UNIT) * Math.PI)) : 0;
+        const ty = this.state === 'WALK' ? 4 - (20 * bounce) : 0; // Softened bounce height (20px) to look simple and elegant
         
-        // Handle character walk animations in JS to prevent CSS playhead glitches during BPM acceleration
-        if (this.state === 'WALK') {
-            const bounce = Math.abs(Math.sin((this.positionX / RHYTHM_CONFIG.BEAT_UNIT) * Math.PI));
-            const ty = 4 - (26 * bounce);
-            const sy = 0.75 + (0.35 * bounce);
-            const sx = 1.15 - (0.25 * bounce);
-            
-            if (this.playerBody) {
-                this.playerBody.style.transform = `scaleY(${sy}) scaleX(${sx}) translateY(${ty}px)`;
-            }
-            
-            const leftRot = -8 - (27 * bounce);
-            const leftSy = 0.9 + (0.2 * bounce);
-            if (this.earLeft) {
-                this.earLeft.style.transform = `rotate(${leftRot}deg) scaleY(${leftSy})`;
-            }
-            
-            const rightRot = 8 + (27 * bounce);
-            const rightSy = 0.9 + (0.2 * bounce);
-            if (this.earRight) {
-                this.earRight.style.transform = `rotate(${rightRot}deg) scaleY(${rightSy})`;
-            }
-        } else {
-            // Revert back to CSS stylesheets for IDLE and FALL animations
-            if (this.playerBody) this.playerBody.style.transform = '';
-            if (this.earLeft) this.earLeft.style.transform = '';
-            if (this.earRight) this.earRight.style.transform = '';
+        if (this.player) {
+            this.player.style.transform = `translate3d(${this.positionX}px, ${ty}px, 0)`;
         }
         
         // Camera follows character
@@ -598,13 +581,7 @@ class SyncEngine {
             this.gameContainer.scrollLeft = 0;
         }
 
-        // Parallax background scrolling (translate layers in opposite direction of camera/player movement) using cached references
-        const scrollX = targetScroll > 0 ? targetScroll : 0;
-        
-        if (this.clouds) this.clouds.style.transform = `translateX(${-scrollX * 0.05}px)`;
-        if (this.back) this.back.style.transform = `translateX(${-scrollX * 0.12}px)`;
-        if (this.mid) this.mid.style.transform = `translateX(${-scrollX * 0.28}px)`;
-        if (this.front) this.front.style.transform = `translateX(${-scrollX * 0.48}px)`;
+        // Parallax scrolling layers kept static to avoid dynamic vector image rasterization on low-end systems
     }
 }
 
@@ -616,10 +593,11 @@ function generateBridge(beatUnit) {
     if (!bridgeContainer) return;
     bridgeContainer.innerHTML = '';
     
-    // Always start with a solid block for spawn (8 beats long to give reaction time)
+    // Always start with a solid block for spawn (8 beats long to give reaction time) using absolute position
     const seg = document.createElement('div');
     seg.className = 'bridge-segment solid';
-    seg.style.flex = `0 0 ${8 * beatUnit}px`;
+    seg.style.left = '0px';
+    seg.style.width = `${8 * beatUnit}px`;
     bridgeContainer.appendChild(seg);
 }
 
