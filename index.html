@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bridge of Beats</title>
+    <!-- Modern font to complement the visual style -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Game State Overlays -->
+    <div id="screen-glitch"></div>
+    <div id="start-screen">
+        <div class="start-card">
+            <h1 class="start-title">Rhythm Bridge</h1>
+            <p class="start-subtitle">Help the rabbit cross the gaps by selecting the matching rhythm beat blocks!</p>
+            <p class="high-score-display">BEST SCORE: <span id="start-best-score">0</span></p>
+            <button id="btn-start" class="btn-start">START GAME</button>
+        </div>
+    </div>
+    <div id="level-complete" style="display: none;">LEVEL COMPLETE!</div>
+    <div id="game-over" style="display: none;">
+        <div class="game-over-card">
+            <h2 class="game-over-title">GAME OVER</h2>
+            <p class="score-summary">SCORE: <span id="final-score">0</span></p>
+            <p class="best-summary">BEST SCORE: <span id="game-over-best-score">0</span></p>
+        </div>
+    </div>
+
+    <!-- A vignette overlay for premium "void" aesthetic -->
+    <div class="vignette"></div>
+    
+    <!-- Live score display during play -->
+    <div id="live-score">SCORE: 0</div>
+    
+    <div class="game-container">
+        <!-- Parallax Cartoon Background -->
+        <div class="parallax-bg">
+            <div class="mountain-layer layer-clouds"></div>
+            <div class="mountain-layer layer-back"></div>
+            <div class="mountain-layer layer-mid"></div>
+            <div class="mountain-layer layer-front"></div>
+        </div>
+
+        <!-- Scrollable environment that represents the track -->
+        <div class="game-world" id="game-world">
+            
+
+            
+            <!-- Bridge Segments (Generated via JS) -->
+            <div class="bridge-container" id="bridge">
+            </div>
+            
+            <!-- Rabbit Character -->
+            <div class="player-character idle" id="player">
+                <div class="player-body">
+                    <div class="rabbit-ears">
+                        <div class="rabbit-ear left">
+                            <div class="inner-ear"></div>
+                        </div>
+                        <div class="rabbit-ear right">
+                            <div class="inner-ear"></div>
+                        </div>
+                    </div>
+                    <div class="rabbit-face">
+                        <div class="rabbit-eye left"></div>
+                        <div class="rabbit-eye right"></div>
+                        <div class="rabbit-nose"></div>
+                        <div class="rabbit-cheek left"></div>
+                        <div class="rabbit-cheek right"></div>
+                    </div>
+                </div>
+                <div id="particle-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI Overlay for Draggable Blocks -->
+    <div class="ui-inventory">
+        <div class="inventory-header">
+            <div class="inventory-title">Rhythm Blocks</div>
+        </div>
+        <div class="inventory-blocks">
+            <div class="note-block block-q" data-type="Q"></div>
+            <div class="note-block block-h" data-type="H"></div>
+            <div class="note-block block-w" data-type="W"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

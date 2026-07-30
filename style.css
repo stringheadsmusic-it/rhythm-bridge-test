@@ -1,0 +1,1024 @@
+:root {
+    /* Cartoon sky and wood colors */
+    --sky-blue: #7cd1f9;
+    --sky-pink: #ffb7b2;
+    --wood-brown: #8b5a2b;
+    --wood-dark: #5c2d0c;
+    --wood-light: #d2b48c;
+
+    /* Rhythm block pastel paint colors */
+    --color-cyan: #2bcbba;
+    /* Quarter block - bright teal */
+    --color-magenta: #fd9644;
+    /* Half block - warm orange */
+    --color-gold: #fed330;
+    /* Whole block - warm gold */
+    --color-neon-green: #2ecc71;
+    /* Accent green / success */
+
+    /* Rhythm Constants */
+    --beat-unit: 100px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    /* Outer fallback block to avoid any edges */
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+    /* We scroll the container instead */
+}
+
+/* Base Game Container */
+.game-container {
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(to bottom, #7cd1f9 0%, #bce6ff 45%, #ffd3b6 75%, #ffb7b2 100%);
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: relative;
+    /* Custom Scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-cyan) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Webkit scrollbar for premium look */
+.game-container::-webkit-scrollbar {
+    height: 6px;
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.game-container::-webkit-scrollbar-thumb {
+    background-color: var(--color-cyan);
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(43, 203, 186, 0.5);
+}
+
+/* Ambient Vignette - Light soft vignette for sky aesthetic */
+.vignette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    background: radial-gradient(circle at center, transparent 40%, rgba(255, 255, 255, 0.15) 100%);
+    z-index: 10;
+    /* Above all game elements except UI overlay */
+}
+
+/* The scrollable canvas (Track) */
+.game-world {
+    /* Dynamic width set in JS based on song size / level duration */
+    height: 100%;
+    position: relative;
+    background: transparent;
+}
+
+/* -----------------------------
+ * Parallax Background Layers
+ * ----------------------------- */
+.parallax-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.mountain-layer {
+    position: absolute;
+    left: 0;
+    width: 200%;
+    /* Wider than screen to allow parallax scrolling */
+    will-change: transform;
+}
+
+.layer-clouds {
+    height: 180px;
+    top: 5%;
+    opacity: 0.55;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='100' viewBox='0 0 400 100'><path d='M 30,60 A 25,25 0 0,1 80,60 A 30,30 0 0,1 130,70 A 25,25 0 0,1 155,80 L 10,80 Z' fill='white'/><path d='M 230,50 A 20,20 0 0,1 270,50 A 25,25 0 0,1 310,60 A 20,20 0 0,1 330,70 L 210,70 Z' fill='white' opacity='0.7'/></svg>");
+    background-repeat: repeat-x;
+    background-size: 600px 180px;
+}
+
+.layer-back {
+    height: 380px;
+    bottom: 120px;
+    opacity: 0.65;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='300' viewBox='0 0 600 300'><path d='M 0,300 L 0,180 L 150,80 L 320,220 L 450,110 L 600,240 L 600,300 Z' fill='%23e2d5f3'/></svg>");
+    background-repeat: repeat-x;
+    background-size: 1000px 380px;
+}
+
+.layer-mid {
+    height: 300px;
+    bottom: 60px;
+    opacity: 0.8;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='300' viewBox='0 0 600 300'><path d='M 0,300 L 0,220 L 120,160 L 280,260 L 420,150 L 600,250 L 600,300 Z' fill='%23b0d4f1'/></svg>");
+    background-repeat: repeat-x;
+    background-size: 800px 300px;
+}
+
+.layer-front {
+    height: 200px;
+    bottom: -10px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='300' viewBox='0 0 600 300'><path d='M 0,300 L 0,240 L 180,180 L 360,270 L 480,210 L 600,260 L 600,300 Z' fill='%238cd3a7'/></svg>");
+    background-repeat: repeat-x;
+    background-size: 600px 200px;
+}
+
+
+
+/* Grid lines removed for cleaner aesthetic and performance optimization */
+
+/* Failure background transformation */
+body.failed .game-container {
+    background: linear-gradient(to bottom, #ff7675 0%, #ff8787 45%, #c92a2a 100%) !important;
+    transition: background 0.3s ease;
+}
+
+/* -----------------------------
+ * Player Character
+ * ----------------------------- */
+
+.player-character {
+    position: absolute;
+    top: calc(50% - 38px);
+    /* Stands on the bridge at calc(50% + 10px) */
+    left: 100px;
+    width: 48px;
+    height: 48px;
+    z-index: 10;
+    transform-origin: bottom center;
+    will-change: transform;
+}
+
+.player-body {
+    width: 100%;
+    height: 100%;
+    background-color: #ffffff;
+    border-radius: 50% 50% 42% 42% / 55% 55% 45% 45%;
+    /* Chubbier pear-shape body for rabbit */
+    box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.15);
+    position: relative;
+    transform-origin: bottom center;
+}
+
+/* Rabbit Ears Styling */
+.rabbit-ears {
+    position: absolute;
+    top: -22px;
+    /* Sticks out above the head */
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+    box-sizing: border-box;
+}
+
+.rabbit-ear {
+    width: 12px;
+    height: 26px;
+    background-color: #ffffff;
+    border-radius: 50% 50% 20% 20%;
+    position: relative;
+    transform-origin: bottom center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.rabbit-ear.left {
+    transform: rotate(-10deg);
+}
+
+.rabbit-ear.right {
+    transform: rotate(10deg);
+}
+
+.inner-ear {
+    position: absolute;
+    top: 4px;
+    left: 3px;
+    width: 6px;
+    height: 18px;
+    background-color: #ffb7b2;
+    /* Soft pink inner ear */
+    border-radius: 50% 50% 20% 20%;
+}
+
+/* Rabbit Face Styling */
+.rabbit-face {
+    position: absolute;
+    top: 14px;
+    left: 0;
+    width: 100%;
+    height: 20px;
+}
+
+.rabbit-eye {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: #2c3e50;
+    border-radius: 50%;
+    top: 4px;
+}
+
+.rabbit-eye.left {
+    left: 12px;
+}
+
+.rabbit-eye.right {
+    right: 12px;
+}
+
+.rabbit-nose {
+    position: absolute;
+    width: 6px;
+    height: 5px;
+    background-color: #ff7675;
+    border-radius: 50% 50% 60% 60%;
+    top: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* Rabbit Buck Teeth */
+.rabbit-nose::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 1px;
+    width: 4px;
+    height: 3px;
+    background: #ffffff;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    border-radius: 0 0 1px 1px;
+}
+
+.rabbit-cheek {
+    position: absolute;
+    width: 8px;
+    height: 5px;
+    background-color: rgba(255, 183, 178, 0.6);
+    border-radius: 50%;
+    top: 8px;
+}
+
+.rabbit-cheek.left {
+    left: 6px;
+}
+
+.rabbit-cheek.right {
+    right: 6px;
+}
+
+/* State: IDLE - Subtle float/breathe */
+.player-character.idle .player-body {
+    animation: idleAnim 2s ease-in-out infinite;
+}
+
+.player-character.idle .rabbit-ear.left {
+    animation: earBreatheLeft 2s ease-in-out infinite;
+}
+
+.player-character.idle .rabbit-ear.right {
+    animation: earBreatheRight 2s ease-in-out infinite;
+}
+
+@keyframes idleAnim {
+
+    0%,
+    100% {
+        transform: scaleY(1) translateY(0);
+    }
+
+    50% {
+        transform: scaleY(0.94) translateY(2px);
+    }
+}
+
+@keyframes earBreatheLeft {
+
+    0%,
+    100% {
+        transform: rotate(-10deg);
+    }
+
+    50% {
+        transform: rotate(-14deg);
+    }
+}
+
+@keyframes earBreatheRight {
+
+    0%,
+    100% {
+        transform: rotate(10deg);
+    }
+
+    50% {
+        transform: rotate(14deg);
+    }
+}
+
+/* State: WALK - Handled dynamically in JS render loop for zero-stutter speed progression */
+.player-character.walk .player-body {}
+.player-character.walk .rabbit-ear.left {}
+.player-character.walk .rabbit-ear.right {}
+
+/* Simulates jumping to the next grid line. Squish landing, spring up and move. */
+@keyframes walkAnim {
+    0% {
+        transform: scaleY(0.75) scaleX(1.15) translateY(4px);
+    }
+
+    /* Landing squish */
+    15% {
+        transform: scaleY(1.15) scaleX(0.85) translateY(-14px);
+    }
+
+    /* Spring up */
+    50% {
+        transform: scaleY(1) scaleX(1) translateY(-22px);
+    }
+
+    /* Apex */
+    100% {
+        transform: scaleY(0.75) scaleX(1.15) translateY(4px);
+    }
+
+    /* Next landing squish */
+}
+
+@keyframes earFlopLeft {
+
+    0%,
+    100% {
+        transform: rotate(-8deg) scaleY(0.9);
+    }
+
+    15% {
+        transform: rotate(-25deg) scaleY(1.1);
+    }
+
+    50% {
+        transform: rotate(-35deg) scaleY(0.9);
+    }
+}
+
+@keyframes earFlopRight {
+
+    0%,
+    100% {
+        transform: rotate(8deg) scaleY(0.9);
+    }
+
+    15% {
+        transform: rotate(25deg) scaleY(1.1);
+    }
+
+    50% {
+        transform: rotate(35deg) scaleY(0.9);
+    }
+}
+
+/* State: FALL - Validation Failure */
+.player-character.fall .player-body {
+    animation: fallAnim 1.2s ease-in forwards;
+}
+
+@keyframes fallAnim {
+    0% {
+        transform: translateY(0) rotate(0deg);
+    }
+
+    100% {
+        transform: translateY(220px) rotate(360deg) scale(0.2);
+        opacity: 0;
+    }
+}
+
+/* Placed block that fails validation drops into the void */
+.note-block.falling {
+    animation: blockFallAnim 1.2s ease-in forwards !important;
+    pointer-events: none;
+    transform-origin: bottom left !important;
+}
+
+/* Wrong block fits in a tilted disorganized way */
+.note-block.wrong-fit {
+    transform: translateY(-3px) rotate(5deg);
+    transform-origin: bottom left;
+    z-index: 8;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes blockFallAnim {
+    0% {
+        transform: translateY(-3px) rotate(5deg) scale(1);
+    }
+
+    100% {
+        transform: translateY(220px) rotate(185deg) scale(0.2);
+        opacity: 0;
+    }
+}
+
+/* -----------------------------
+ * Bridge Architecture
+ * ----------------------------- */
+.bridge-container {
+    position: absolute;
+    top: calc(50% + 10px);
+    /* Just under the player's pivot */
+    left: 0;
+    display: flex;
+    height: 28px;
+    z-index: 5;
+}
+
+.bridge-segment {
+    height: 100%;
+}
+
+.bridge-segment.solid {
+    /* Wooden planks style */
+    background: repeating-linear-gradient(to right,
+            #b87333,
+            #b87333 18px,
+            #8b5a2b 18px,
+            #8b5a2b 20px);
+    border-top: 4px solid #5c2d0c;
+    border-bottom: 4px solid #3d1e08;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.15), 0 4px 6px rgba(0, 0, 0, 0.15);
+    position: relative;
+}
+
+/* Repeating rope railing & wooden posts every 100px (1 Beat) */
+.bridge-segment.solid::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: 0;
+    width: 100%;
+    height: 20px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='20' viewBox='0 0 100 20'><rect x='46' y='4' width='8' height='16' fill='%238b5a2b' rx='1.5'/><circle cx='50' cy='4' r='3' fill='%235c2d0c'/><path d='M 0,5 Q 50,18 100,5' fill='none' stroke='%23d2b48c' stroke-width='2.5' stroke-dasharray='3,1.5'/><path d='M 0,6 Q 50,19 100,6' fill='none' stroke='%238b5a2b' stroke-width='1.5'/></svg>");
+    background-repeat: repeat-x;
+    background-size: 100px 20px;
+    z-index: 6;
+}
+
+.bridge-segment.gap {
+    background-color: rgba(255, 255, 255, 0.05);
+    /* very soft guide gap */
+    border-bottom: 2px dashed #8b5a2b;
+    position: relative;
+    display: flex;
+    /* So dropped blocks align naturally left */
+    align-items: flex-end;
+    /* Drop to bottom of gap */
+    transition: background-color 0.2s, box-shadow 0.2s;
+
+    /* Subdivide gap every 100px (1 Beat) with a vertical dashed line */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='28' viewBox='0 0 100 28'><line x1='99' y1='0' x2='99' y2='28' stroke='%238b5a2b' stroke-opacity='0.35' stroke-width='1.5' stroke-dasharray='4,3'/></svg>");
+    background-repeat: repeat-x;
+    background-size: 100px 28px;
+
+    /* Prevent auto-expansion when a larger block is placed */
+    min-width: 0;
+    overflow: visible;
+}
+
+/* Broken hanging ropes in empty gaps to indicate visual damage */
+.bridge-segment.gap::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    width: 15px;
+    height: 12px;
+    border-right: 2px dashed #8b5a2b;
+    border-bottom: 2px dashed #8b5a2b;
+    border-radius: 0 0 100% 0;
+    transform: rotate(30deg);
+}
+
+.bridge-segment.gap::after {
+    content: '';
+    position: absolute;
+    top: -12px;
+    right: 0;
+    width: 15px;
+    height: 12px;
+    border-left: 2px dashed #8b5a2b;
+    border-bottom: 2px dashed #8b5a2b;
+    border-radius: 0 0 0 100%;
+    transform: rotate(-30deg);
+}
+
+.bridge-segment.gap.drag-over {
+    background-color: rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.3);
+    border-bottom: 2px solid #8b5a2b;
+}
+
+/* -----------------------------
+ * UI & Note Blocks
+ * ----------------------------- */
+.ui-inventory {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.85);
+    /* Light glassmorphism */
+    border: 1.5px solid rgba(255, 255, 255, 0.6);
+    padding: 15px 30px;
+    border-radius: 16px;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.inventory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 20px;
+}
+
+.inventory-title {
+    color: #4b6584;
+    /* Soft slate color */
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    opacity: 0.9;
+    font-weight: 700;
+}
+
+.btn-run {
+    background: #2ecc71;
+    /* Accent green success */
+    color: #fff;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
+    transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s;
+}
+
+.btn-run:hover {
+    transform: scale(1.05);
+    background-color: #27ae60;
+    box-shadow: 0 6px 15px rgba(46, 204, 113, 0.5);
+}
+
+.btn-run:active {
+    transform: scale(0.95);
+}
+
+.btn-run[disabled] {
+    background: #bdc3c7;
+    color: #7f8c8d;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.inventory-blocks {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 70px;
+}
+
+.inventory-blocks .note-block {
+    height: 60px;
+    cursor: pointer;
+}
+
+.note-block {
+    height: 24px;
+    border-radius: 4px;
+    cursor: grab;
+    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+    flex-shrink: 0;
+    /* Ensures blocks do not shrink */
+
+    /* Wooden board effect */
+    border: 2.5px solid rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.25), 0 3px 5px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.note-block:active {
+    cursor: grabbing;
+}
+
+.inventory-blocks .note-block:hover {
+    transform: translateY(-5px);
+}
+
+/* Note symbol styling centered inside block using vector SVG background images */
+.note-block::after {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.45));
+}
+
+/* Types */
+.block-q {
+    width: 100px;
+    background-color: var(--color-cyan);
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
+}
+
+.block-q::after {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' width='20' height='20'><ellipse cx='8' cy='13' rx='4.5' ry='3.2' fill='white' transform='rotate(-25 8 13)'/><rect x='11.5' y='3' width='1.5' height='10.5' fill='white'/></svg>");
+}
+
+.block-h {
+    width: 200px;
+    background-color: var(--color-magenta);
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
+}
+
+.block-h::after {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' width='20' height='20'><ellipse cx='8' cy='13' rx='4' ry='2.8' fill='none' stroke='white' stroke-width='2' transform='rotate(-25 8 13)'/><rect x='11.5' y='3' width='1.5' height='10.5' fill='white'/></svg>");
+}
+
+.block-w {
+    width: 400px;
+    background-color: var(--color-gold);
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
+}
+
+.block-w::after {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' width='20' height='20'><ellipse cx='10' cy='10' rx='5.5' ry='3.5' fill='none' stroke='white' stroke-width='2.2' transform='rotate(-25 10 10)'/></svg>");
+}
+
+/* Placed blocks in gaps */
+.bridge-segment .note-block {
+    cursor: pointer;
+    /* Can drag again */
+    /* Snaps directly inline via flexbox starting from left edge perfectly */
+    margin: 0;
+    margin-bottom: 2px;
+    transition: transform 0.1s, box-shadow 0.2s, filter 0.2s;
+}
+
+.bridge-segment .note-block:hover {
+    opacity: 0.8;
+}
+
+/* -----------------------------
+ * Audio Playhead Visuals
+ * ----------------------------- */
+
+/* Active Bloom on Notes */
+.bridge-segment .note-block.active-bloom {
+    transform: scaleY(1.08) scaleX(1.01);
+    z-index: 10;
+}
+
+.bridge-segment .note-block.block-q.active-bloom {
+    filter: brightness(1.15) drop-shadow(0 0 15px var(--color-cyan));
+}
+
+.bridge-segment .note-block.block-h.active-bloom {
+    filter: brightness(1.15) drop-shadow(0 0 15px var(--color-magenta));
+}
+
+.bridge-segment .note-block.block-w.active-bloom {
+    filter: brightness(1.15) drop-shadow(0 0 15px var(--color-gold));
+}
+
+/* Character Ring Particle System */
+#particle-container {
+    position: absolute;
+    bottom: -5px;
+    /* Center at the feet */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    overflow: visible;
+}
+
+.ring-wave {
+    position: absolute;
+    border: 3px solid #2ecc71;
+    border-radius: 50%;
+    box-sizing: border-box;
+    transform: translate(-50%, -50%);
+    animation: ringWaveAnim 0.6s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+    pointer-events: none;
+}
+
+@keyframes ringWaveAnim {
+    0% {
+        width: 10px;
+        height: 10px;
+        opacity: 1;
+        border-width: 5px;
+    }
+
+    100% {
+        width: 120px;
+        height: 60px;
+        /* Expands as an oval on the floor plane */
+        opacity: 0;
+        border-width: 1px;
+    }
+}
+
+/* -----------------------------
+ * Game Overlays (Glitch & Win)
+ * ----------------------------- */
+
+#screen-glitch {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(255, 0, 0, 0.3);
+    mix-blend-mode: exclusion;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    display: none;
+}
+
+#screen-glitch.active {
+    display: block;
+    animation: glitchAnim 0.2s steps(2, end) infinite;
+}
+
+@keyframes glitchAnim {
+    0% {
+        opacity: 0.1;
+        transform: translate(0, 0);
+    }
+
+    20% {
+        opacity: 0.8;
+        transform: translate(-10px, 10px);
+    }
+
+    40% {
+        opacity: 0.3;
+        transform: translate(10px, -10px);
+    }
+
+    60% {
+        opacity: 1;
+        transform: translate(-10px, -10px);
+    }
+
+    80% {
+        opacity: 0.5;
+        transform: translate(10px, 10px);
+    }
+
+    100% {
+        opacity: 0.9;
+        transform: translate(0, 0);
+    }
+}
+
+#level-complete {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 64px;
+    font-weight: 800;
+    color: #27ae60;
+    text-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+    z-index: 100;
+    pointer-events: none;
+    text-align: center;
+    letter-spacing: 4px;
+    display: none;
+    animation: winAnim 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+#game-over {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(41, 18, 18, 0.45); /* soft reddish dark overlay */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 150;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.4s ease;
+}
+
+.game-over-card {
+    background: linear-gradient(135deg, rgba(255, 230, 230, 0.60) 0%, rgba(255, 200, 200, 0.40) 100%);
+    border: 1.5px solid rgba(255, 100, 100, 0.2);
+    border-radius: 24px;
+    padding: 40px 60px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    animation: startEnter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.game-over-title {
+    font-size: 48px;
+    font-weight: 800;
+    margin: 0 0 15px 0;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    background: linear-gradient(to right, #ff3333, #ff6666);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 4px 12px rgba(255, 50, 50, 0.25);
+}
+
+.score-summary, .best-summary {
+    font-size: 20px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 10px 0;
+    font-family: inherit;
+}
+
+.best-summary {
+    color: #27ae60;
+}
+
+.high-score-display {
+    font-size: 20px;
+    font-weight: 800;
+    color: #27ae60;
+    margin: 0 0 25px 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#live-score {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    z-index: 100;
+    background: rgba(0,0,0,0.4);
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-family: inherit;
+}
+
+@keyframes winAnim {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -30%) scale(0.7);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Start Screen Styles */
+#start-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(18, 25, 41, 0.45);
+    /* soft transparent dark overlay */
+    backdrop-filter: blur(12px);
+    /* premium glass blur */
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 150;
+    /* above all overlays */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#start-screen.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.start-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.60) 0%, rgba(255, 255, 255, 0.40) 100%);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+    padding: 40px 60px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    animation: startEnter 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes startEnter {
+    0% {
+        opacity: 0;
+        transform: translateY(40px) scale(0.9);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.start-title {
+    font-size: 48px;
+    font-weight: 800;
+    margin: 0 0 15px 0;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    background: linear-gradient(to right, #010101, #212222);
+    /* soft bright blue gradient */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 4px 12px rgba(0, 198, 255, 0.25);
+}
+
+.start-subtitle {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+    margin: 0 0 35px 0;
+}
+
+.btn-start {
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    color: #fff;
+    border: none;
+    padding: 16px 40px;
+    font-size: 20px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(46, 204, 113, 0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+    font-family: inherit;
+}
+
+.btn-start:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 25px rgba(46, 204, 113, 0.6);
+}
+
+.btn-start:active {
+    transform: scale(0.95);
+}
