@@ -48,15 +48,7 @@ html {
 
 /* Ambient Vignette - Light soft vignette for sky aesthetic */
 .vignette {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    pointer-events: none;
-    background: radial-gradient(circle at center, transparent 40%, rgba(255, 255, 255, 0.15) 100%);
-    z-index: 10;
-    /* Above all game elements except UI overlay */
+    display: none; /* Hide vignette to save compositing paint overhead */
 }
 
 /* The scrollable canvas (Track) */
@@ -65,6 +57,8 @@ html {
     height: 100%;
     position: relative;
     background: transparent;
+    transform: scale(0.7);
+    transform-origin: left center;
     will-change: transform; /* Promote entire game world to GPU composited layer for stutter-free scrolling */
 }
 
@@ -72,14 +66,7 @@ html {
  * Parallax Background Layers
  * ----------------------------- */
 .parallax-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
+    display: none; /* Hide multi-layered vector backgrounds for ultra-lightweight rendering */
 }
 
 .mountain-layer {
@@ -410,7 +397,6 @@ body.failed .game-container {
     transform: translateY(-3px) rotate(5deg);
     transform-origin: bottom left;
     z-index: 8;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes blockFallAnim {
@@ -433,39 +419,38 @@ body.failed .game-container {
     /* Just under the player's pivot */
     left: 0;
     width: 100%;
-    height: 28px;
+    height: 48px;
     z-index: 5;
+    will-change: transform;
 }
 
 .bridge-segment {
     position: absolute;
     top: 0;
     height: 100%;
+    contain: layout style;
 }
 
 .bridge-segment.solid {
-    /* Wooden planks style */
+    /* Wooden planks style - 100px width matching 1-beat single block length */
     background: repeating-linear-gradient(to right,
             #b87333,
-            #b87333 18px,
-            #8b5a2b 18px,
-            #8b5a2b 20px);
+            #b87333 97px,
+            #5c2d0c 97px,
+            #5c2d0c 100px);
     border-top: 4px solid #5c2d0c;
     border-bottom: 4px solid #3d1e08;
-    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.15), 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 
-/* Repeating rope railing & wooden posts every 100px (1 Beat) */
+/* Accent top post border */
 .bridge-segment.solid::before {
     content: '';
     position: absolute;
-    top: -20px;
+    top: -4px;
     left: 0;
     width: 100%;
-    height: 20px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='20' viewBox='0 0 100 20'><rect x='46' y='4' width='8' height='16' fill='%238b5a2b' rx='1.5'/><circle cx='50' cy='4' r='3' fill='%235c2d0c'/><path d='M 0,5 Q 50,18 100,5' fill='none' stroke='%23d2b48c' stroke-width='2.5' stroke-dasharray='3,1.5'/><path d='M 0,6 Q 50,19 100,6' fill='none' stroke='%238b5a2b' stroke-width='1.5'/></svg>");
-    background-repeat: repeat-x;
-    background-size: 100px 20px;
+    height: 4px;
+    background-color: #d2b48c;
     z-index: 6;
 }
 
@@ -473,16 +458,16 @@ body.failed .game-container {
     background-color: rgba(255, 255, 255, 0.05);
     /* very soft guide gap */
     border-bottom: 2px dashed #8b5a2b;
+    border-top: 2px dashed #8b5a2b;
     display: flex;
     /* So dropped blocks align naturally left */
     align-items: flex-end;
     /* Drop to bottom of gap */
-    transition: background-color 0.2s, box-shadow 0.2s;
 
-    /* Subdivide gap every 100px (1 Beat) with a vertical dashed line */
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='28' viewBox='0 0 100 28'><line x1='99' y1='0' x2='99' y2='28' stroke='%238b5a2b' stroke-opacity='0.35' stroke-width='1.5' stroke-dasharray='4,3'/></svg>");
+    /* Subdivide gap every 100px (1 Beat) with a single vertical dashed line */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='48' viewBox='0 0 100 48'><line x1='99' y1='0' x2='99' y2='48' stroke='%238b5a2b' stroke-opacity='0.45' stroke-width='2' stroke-dasharray='4,3'/></svg>");
     background-repeat: repeat-x;
-    background-size: 100px 28px;
+    background-size: 100px 48px;
 
     /* Prevent auto-expansion when a larger block is placed */
     min-width: 0;
@@ -491,34 +476,15 @@ body.failed .game-container {
 
 /* Broken hanging ropes in empty gaps to indicate visual damage */
 .bridge-segment.gap::before {
-    content: '';
-    position: absolute;
-    top: -12px;
-    left: 0;
-    width: 15px;
-    height: 12px;
-    border-right: 2px dashed #8b5a2b;
-    border-bottom: 2px dashed #8b5a2b;
-    border-radius: 0 0 100% 0;
-    transform: rotate(30deg);
+    display: none;
 }
 
 .bridge-segment.gap::after {
-    content: '';
-    position: absolute;
-    top: -12px;
-    right: 0;
-    width: 15px;
-    height: 12px;
-    border-left: 2px dashed #8b5a2b;
-    border-bottom: 2px dashed #8b5a2b;
-    border-radius: 0 0 0 100%;
-    transform: rotate(-30deg);
+    display: none;
 }
 
 .bridge-segment.gap.drag-over {
-    background-color: rgba(255, 255, 255, 0.2);
-    box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.3);
     border-bottom: 2px solid #8b5a2b;
 }
 
@@ -530,9 +496,8 @@ body.failed .game-container {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.85);
-    /* Light glassmorphism */
-    border: 1.5px solid rgba(255, 255, 255, 0.6);
+    background: rgba(245, 247, 250, 0.98);
+    border: 1.5px solid rgba(0, 0, 0, 0.1);
     padding: 15px 30px;
     border-radius: 16px;
     z-index: 20;
@@ -540,9 +505,6 @@ body.failed .game-container {
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
 .inventory-header {
@@ -603,21 +565,19 @@ body.failed .game-container {
 }
 
 .inventory-blocks .note-block {
-    height: 60px;
+    height: 48px;
     cursor: pointer;
 }
 
 .note-block {
-    height: 24px;
+    height: 48px;
     border-radius: 4px;
     cursor: grab;
-    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
     flex-shrink: 0;
     /* Ensures blocks do not shrink */
 
     /* Wooden board effect */
     border: 2.5px solid rgba(0, 0, 0, 0.2);
-    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.25), 0 3px 5px rgba(0, 0, 0, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -648,7 +608,6 @@ body.failed .game-container {
 .block-q {
     width: 100px;
     background-color: var(--color-cyan);
-    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
 }
 
 .block-q::after {
@@ -658,7 +617,6 @@ body.failed .game-container {
 .block-h {
     width: 200px;
     background-color: var(--color-magenta);
-    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
 }
 
 .block-h::after {
@@ -668,7 +626,6 @@ body.failed .game-container {
 .block-w {
     width: 400px;
     background-color: var(--color-gold);
-    background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.03) 10px, rgba(0, 0, 0, 0.03) 20px);
 }
 
 .block-w::after {
@@ -682,7 +639,6 @@ body.failed .game-container {
     /* Snaps directly inline via flexbox starting from left edge perfectly */
     margin: 0;
     margin-bottom: 2px;
-    transition: transform 0.1s, box-shadow 0.2s, filter 0.2s;
 }
 
 .bridge-segment .note-block:hover {
@@ -828,9 +784,7 @@ body.failed .game-container {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(41, 18, 18, 0.45); /* soft reddish dark overlay */
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(30, 10, 10, 0.95); /* Opaque solid reddish dark overlay for Smartboards */
     z-index: 150;
     display: none;
     align-items: center;
@@ -918,11 +872,7 @@ body.failed .game-container {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(18, 25, 41, 0.45);
-    /* soft transparent dark overlay */
-    backdrop-filter: blur(12px);
-    /* premium glass blur */
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(18, 25, 41, 0.95); /* Opaque solid dark overlay for Smartboards */
     z-index: 150;
     /* above all overlays */
     display: flex;

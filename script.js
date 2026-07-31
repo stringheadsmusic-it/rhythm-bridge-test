@@ -172,6 +172,15 @@ class SyncEngine {
         // Arrays for gap/block caching instead of DOM traversal
         this.gaps = [];
         this.placedBlocks = [];
+        this.segments = [];
+        this.viewportWidth = this.gameContainer ? this.gameContainer.clientWidth : window.innerWidth;
+        
+        this.resizeHandler = () => {
+            if (this.gameContainer) {
+                this.viewportWidth = this.gameContainer.clientWidth;
+            }
+        };
+        window.addEventListener('resize', this.resizeHandler);
         
         // Spec: 120 BPM -> 2 beats per second. 1 Beat = 100px.
         // Therefore, velocity = 2 * 100px = 200px/s
@@ -188,9 +197,12 @@ class SyncEngine {
         this.currentGapWaiting = null;
         this.lastRenderedPositionX = null;
         this.lastClickBeat = -1;
+        this.accumulator = 0; // Fixed timestep physics accumulator
         
         // Initialize starting infinite bridge variables
         this.lastBridgeSegmentType = 'solid';
+        const initialSeg = this.generateBridge(RHYTHM_CONFIG.BEAT_UNIT);
+        this.segments = initialSeg ? [initialSeg] : [];
         this.extendBridge();
         
         this.init();
@@ -220,10 +232,18 @@ class SyncEngine {
     }
     
     loop(timestamp) {
-        if (!this.lastTime) this.lastTime = timestamp;
-        const deltaTime = (timestamp - this.lastTime) / 1000; // converted to seconds
+        if (!this.lastTime) {
+            this.lastTime = timestamp;
+            this.requestID = requestAnimationFrame(this.loop);
+            return;
+        }
+        
+        let deltaTime = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
-
+        
+        // Cap deltaTime to avoid spikes if tab goes background
+        if (deltaTime > 0.1) deltaTime = 0.1;
+        
         this.update(deltaTime);
         this.render();
         
@@ -234,7 +254,7 @@ class SyncEngine {
         if (this.state === 'WALK') {
             this.positionX += this.velocity * deltaTime;
             
-            // Metronome Click Track Trigger (synchronized to rabbit's position beats)
+            // Metronome Click Track Trigger (synchronized to rabbit's landing position beats)
             const triggerX = this.positionX + 100;
             const currentBeat = Math.floor(triggerX / RHYTHM_CONFIG.BEAT_UNIT);
             if (currentBeat !== this.lastClickBeat) {
@@ -255,9 +275,12 @@ class SyncEngine {
                 this.player.style.setProperty('--walk-duration', `${beatDuration}s`);
             }
             
-            // Update live score display via cached reference
-            if (this.scoreEl) {
-                this.scoreEl.textContent = `SCORE: ${beatIndex}`;
+            // Update live score display only when beat index changes
+            if (this.lastScore !== beatIndex) {
+                this.lastScore = beatIndex;
+                if (this.scoreEl) {
+                    this.scoreEl.textContent = `SCORE: ${beatIndex}`;
+                }
             }
             
             // Extend the bridge dynamically
@@ -266,46 +289,43 @@ class SyncEngine {
             this.checkGapDetection();
             this.checkAudioTriggers();
         }
+        
+        // No layout recalculations inside update loop
     }
     
     checkGapDetection() {
         const triggerX = this.positionX + 100;
         
-        for (let gap of this.gaps) {
-            const gapAbsLeft = gap.offsetLeft;
-            
-            // When rabbit leading edge enters the gap
-            if (triggerX >= gapAbsLeft && triggerX < gapAbsLeft + gap.offsetWidth) {
-                if (this.lastGapChecked !== gap) {
-                    this.lastGapChecked = gap;
-                    
-                    const block = gap.querySelector('.note-block');
-                    if (block) {
-                        const type = block.dataset.type;
-                        const expectedWidth = type === 'W' ? 400 : (type === 'H' ? 200 : 100);
-                        const gapWidth = gap.offsetWidth;
+        for (let i = 0; i < this.segments.length; i++) {
+            const seg = this.segments[i];
+            if (seg.type === 'gap') {
+                if (triggerX >= seg.x && triggerX < seg.x + seg.width) {
+                    if (this.lastGapChecked !== seg) {
+                        this.lastGapChecked = seg;
                         
-                        if (expectedWidth === gapWidth) {
-                            // Correct block! Add bloom effect and let rabbit pass
-                            block.classList.add('active-bloom');
+                        if (seg.block) {
+                            const blockType = seg.block.type;
+                            const expectedWidth = blockType === 'W' ? 400 : (blockType === 'H' ? 200 : 100);
+                            
+                            if (expectedWidth === seg.width) {
+                                // Correct block! Add bloom effect and let rabbit pass
+                                seg.block.dom.classList.add('active-bloom');
+                            } else {
+                                // Incorrect block! Block and rabbit fall together immediately
+                                seg.block.dom.classList.add('wrong-fit');
+                                seg.block.dom.classList.add('falling');
+                                this.triggerFall();
+                                break;
+                            }
                         } else {
-                            // Incorrect block! Block and rabbit fall together immediately
-                            block.classList.add('wrong-fit');
-                            block.classList.add('falling');
+                            // Unfilled gap! Rabbit falls immediately into the void
                             this.triggerFall();
                             break;
                         }
-                    } else {
-                        // Unfilled gap! Rabbit falls immediately into the void
-                        this.triggerFall();
-                        break;
                     }
                 }
             }
         }
-        
-        // Garbage collect array cache references for gaps that are completely behind the rabbit (keeps array length very small)
-        this.gaps = this.gaps.filter(gap => gap.offsetLeft + gap.offsetWidth > this.positionX - 200);
     }
     
     handleInput(type) {
@@ -314,31 +334,34 @@ class SyncEngine {
         const triggerX = this.positionX + 100;
         let targetGap = null;
         
-        for (let gap of this.gaps) {
-            // Must be ahead of rabbit (with a 50px buffer)
-            if (gap.offsetLeft > triggerX - 50) {
-                const block = gap.querySelector('.note-block');
-                if (!block) {
-                    targetGap = gap;
+        for (let i = 0; i < this.segments.length; i++) {
+            const seg = this.segments[i];
+            if (seg.type === 'gap') {
+                // Must be ahead of rabbit (with a 50px buffer)
+                if (seg.x > triggerX - 50 && !seg.block) {
+                    targetGap = seg;
                     break;
                 }
             }
         }
         
         if (targetGap) {
-            targetGap.innerHTML = '';
-            const newBlock = document.createElement('div');
-            newBlock.className = `note-block block-${type.toLowerCase()}`;
-            newBlock.dataset.type = type;
-            
-            // If the placed block size does not match the gap width, immediately style it as disorganized/wrong-fit
-            const expectedWidth = type === 'W' ? 400 : (type === 'H' ? 200 : 100);
-            if (expectedWidth !== targetGap.offsetWidth) {
-                newBlock.classList.add('wrong-fit');
+            // Toggle pre-rendered note block visibility (zero DOM reflows)
+            const blockDom = targetGap.dom.querySelector(`.block-${type.toLowerCase()}`);
+            if (blockDom) {
+                blockDom.style.display = 'flex';
+                
+                // Style wrong fit if expected size does not match gap
+                const expectedWidth = type === 'W' ? 400 : (type === 'H' ? 200 : 100);
+                if (expectedWidth !== targetGap.width) {
+                    blockDom.classList.add('wrong-fit');
+                }
+                
+                targetGap.block = {
+                    dom: blockDom,
+                    type: type
+                };
             }
-            
-            targetGap.appendChild(newBlock);
-            this.placedBlocks.push(newBlock); // Add reference to cache
         }
     }
     
@@ -387,16 +410,14 @@ class SyncEngine {
         const bridgeContainer = document.getElementById('bridge');
         if (!bridgeContainer) return;
         
-        const gameWorld = document.getElementById('game-world');
-        
         let lastX = 0;
-        const lastChild = bridgeContainer.lastElementChild;
-        if (lastChild) {
-            lastX = lastChild.offsetLeft + lastChild.offsetWidth;
+        if (this.segments.length > 0) {
+            const lastSeg = this.segments[this.segments.length - 1];
+            lastX = lastSeg.x + lastSeg.width;
         }
         
-        // Keep generating bridge segments up to 2000px ahead of the rabbit
-        while (lastX < this.positionX + 2000) {
+        // Keep generating bridge segments up to 3000px ahead of the rabbit for 70% zoomed view
+        while (lastX < this.positionX + 3000) {
             const solidChoices = [100, 200, 300, 400];
             const gapChoices = [100, 200, 400];
             
@@ -417,40 +438,87 @@ class SyncEngine {
             seg.className = `bridge-segment ${type}`;
             seg.style.left = `${lastX}px`;
             seg.style.width = `${width}px`;
-            bridgeContainer.appendChild(seg);
             
             if (type === 'gap') {
-                this.gaps.push(seg); // Cache gap reference
+                // Pre-render note block elements in a hidden state inside the gap container
+                // This eliminates layout reflows during active gameplay placement
+                const blockQ = document.createElement('div');
+                blockQ.className = 'note-block block-q';
+                blockQ.style.display = 'none';
+                
+                const blockH = document.createElement('div');
+                blockH.className = 'note-block block-h';
+                blockH.style.display = 'none';
+                
+                const blockW = document.createElement('div');
+                blockW.className = 'note-block block-w';
+                blockW.style.display = 'none';
+                
+                seg.appendChild(blockQ);
+                seg.appendChild(blockH);
+                seg.appendChild(blockW);
             }
+            
+            bridgeContainer.appendChild(seg);
+            
+            this.segments.push({
+                dom: seg,
+                x: lastX,
+                width: width,
+                type: type,
+                block: null
+            });
             
             lastX += width;
         }
         
-        // Garbage collect old off-screen DOM nodes from the bridge container to keep browser memory usage constant
-        const children = Array.from(bridgeContainer.children);
-        for (let seg of children) {
-            if (seg.offsetLeft + seg.offsetWidth < this.positionX - 800) {
-                seg.remove();
+        // Garbage collect old off-screen DOM nodes to keep browser memory usage constant
+        const visibleSegments = [];
+        for (let seg of this.segments) {
+            if (seg.x + seg.width < this.positionX - 800) {
+                if (seg.dom && seg.dom.parentElement) {
+                    seg.dom.remove();
+                }
+            } else {
+                visibleSegments.push(seg);
             }
         }
+        this.segments = visibleSegments;
+    }
+
+    generateBridge(beatUnit) {
+        const bridgeContainer = document.getElementById('bridge');
+        if (!bridgeContainer) return null;
+        bridgeContainer.innerHTML = '';
         
-        // Dynamically expand the scrollable game world container width
-        if (gameWorld) {
-            gameWorld.style.width = `${lastX + 2000}px`;
-        }
+        // Always start with a solid block for spawn (8 beats long) using absolute position
+        const seg = document.createElement('div');
+        seg.className = 'bridge-segment solid';
+        seg.style.left = '0px';
+        seg.style.width = `${8 * beatUnit}px`;
+        bridgeContainer.appendChild(seg);
+
+        return {
+            dom: seg,
+            x: 0,
+            width: 8 * beatUnit,
+            type: 'solid',
+            block: null
+        };
     }
 
     resetLevel() {
         this.positionX = 0;
         this.lastRenderedPositionX = null; // Force render on next frame
         
-        // Reset camera / game world translation
-        const gameWorld = document.getElementById('game-world');
-        if (gameWorld) {
-            gameWorld.style.transform = 'translate3d(0, 0, 0)';
+        // Reset bridge track translation
+        const bridge = document.getElementById('bridge');
+        if (bridge) {
+            bridge.style.transform = 'translate3d(0, 0, 0)';
         }
         
         this.lastTime = 0;
+        this.accumulator = 0; // Reset fixed-timestep physics accumulator
         this.currentBlock = null;
         this.lastGapChecked = null;
         this.currentGapWaiting = null;
@@ -466,7 +534,8 @@ class SyncEngine {
         this.placedBlocks = [];
         
         // Regenerate bridge platform and rebuild starting layouts
-        generateBridge(RHYTHM_CONFIG.BEAT_UNIT);
+        const initialSeg = this.generateBridge(RHYTHM_CONFIG.BEAT_UNIT);
+        this.segments = initialSeg ? [initialSeg] : [];
         this.lastBridgeSegmentType = 'solid';
         this.extendBridge();
         
@@ -503,49 +572,43 @@ class SyncEngine {
     }
     
     checkAudioTriggers() {
-        const triggerX = this.positionX + 100; 
+        const audioTriggerX = this.positionX + 200; 
+        const animTriggerX = this.positionX + 100;
         
-        let foundBlock = null;
-        
-        // Find block collisions along the X-axis iteratively using array cache
-        for (let block of this.placedBlocks) {
-            if (block.classList.contains('falling') || block.classList.contains('wrong-fit')) continue; // Skip falling or wrong blocks
-            
-            const gap = block.parentElement;
-            if (!gap) continue;
-            
-            const blockAbsLeft = gap.offsetLeft + block.offsetLeft;
-            const blockAbsRight = blockAbsLeft + block.offsetWidth;
-            
-            if (triggerX >= blockAbsLeft && triggerX < blockAbsRight) {
-                foundBlock = block;
-                break;
+        for (let i = 0; i < this.segments.length; i++) {
+            const seg = this.segments[i];
+            if (seg.type === 'gap' && seg.block) {
+                const blockDom = seg.block.dom;
+                if (blockDom.classList.contains('falling') || blockDom.classList.contains('wrong-fit')) continue;
+                
+                const blockAbsLeft = seg.x;
+                const blockAbsRight = seg.x + (seg.block.type === 'W' ? 400 : (seg.block.type === 'H' ? 200 : 100));
+                
+                // 1. Play audio note early at +200px offset
+                if (audioTriggerX >= blockAbsLeft && audioTriggerX < blockAbsRight) {
+                    if (!seg.block.soundPlayed) {
+                        seg.block.soundPlayed = true;
+                        
+                        const type = seg.block.type;
+                        let duration = 0.5; // Quarter=0.5s by spec
+                        if (type === 'H') duration = 1.0;
+                        else if (type === 'W') duration = 2.0;
+                        
+                        playAudioNote(duration, type);
+                    }
+                }
+                
+                // 2. Trigger visual landing bloom & ring wave 100px later (+100px offset)
+                if (animTriggerX >= blockAbsLeft && animTriggerX < blockAbsRight) {
+                    if (!seg.block.animPlayed) {
+                        seg.block.animPlayed = true;
+                        
+                        blockDom.classList.add('active-bloom');
+                        this.spawnRingWave();
+                    }
+                }
             }
         }
-        
-        if (foundBlock && this.currentBlock !== foundBlock) {
-            this.currentBlock = foundBlock;
-            
-            // Bloom and trigger new block!
-            if (this.currentBlock) {
-                this.currentBlock.classList.add('active-bloom');
-                const type = this.currentBlock.dataset.type;
-                
-                let duration = 0.5; // Quarter=0.5s by spec
-                if (type === 'H') duration = 1.0;
-                else if (type === 'W') duration = 2.0;
-                
-                playAudioNote(duration, type);
-                this.spawnRingWave();
-            }
-        }
-        
-        // Garbage collect array cache references for blocks that are completely behind the rabbit
-        this.placedBlocks = this.placedBlocks.filter(block => {
-            const gap = block.parentElement;
-            if (!gap) return false;
-            return gap.offsetLeft + gap.offsetWidth > this.positionX - 200;
-        });
     }
 
     spawnRingWave() {
@@ -569,25 +632,22 @@ class SyncEngine {
             return;
         }
         this.lastRenderedPositionX = this.positionX;
+        
+        // Integer pixel snapping to eliminate sub-pixel rasterization shimmer on 4K displays
+        const roundedX = Math.round(this.positionX);
+        
+        // Translate the bridge track directly to the left by roundedX
+        const bridge = document.getElementById('bridge');
+        if (bridge) {
+            bridge.style.transform = `translate3d(${-roundedX}px, 0, 0)`;
+        }
 
-        // Combine horizontal movement and vertical bounce into a single parent translate3d to avoid layout thrashing
+        // Rabbit character stays anchored horizontally and only bounces vertically
         const bounce = this.state === 'WALK' ? Math.abs(Math.sin((this.positionX / RHYTHM_CONFIG.BEAT_UNIT) * Math.PI)) : 0;
-        const ty = this.state === 'WALK' ? 4 - (20 * bounce) : 0; // Softened bounce height (20px) to look simple and elegant
+        const ty = this.state === 'WALK' ? Math.round(4 - (16 * bounce)) : 0;
         
         if (this.player) {
-            this.player.style.transform = `translate3d(${this.positionX}px, ${ty}px, 0)`;
-        }
-        
-        // Camera follows character
-        // We want the character to remain roughly slightly to the left of the center of screen.
-        const targetScroll = this.positionX - (this.gameContainer.clientWidth * 0.2);
-        const scrollX = targetScroll > 0 ? targetScroll : 0;
-        
-        // Translate the entire #game-world container instead of scrolling the container physically,
-        // which gives fluid, sub-pixel, jitter-free GPU camera scrolling
-        const gameWorld = document.getElementById('game-world');
-        if (gameWorld) {
-            gameWorld.style.transform = `translate3d(${-scrollX}px, 0, 0)`;
+            this.player.style.transform = `translate3d(0, ${ty}px, 0) scale(1.6)`;
         }
     }
 }
@@ -596,16 +656,8 @@ class SyncEngine {
  * Utility to build random procedural bridge
  */
 function generateBridge(beatUnit) {
-    const bridgeContainer = document.getElementById('bridge');
-    if (!bridgeContainer) return;
-    bridgeContainer.innerHTML = '';
-    
-    // Always start with a solid block for spawn (8 beats long to give reaction time) using absolute position
-    const seg = document.createElement('div');
-    seg.className = 'bridge-segment solid';
-    seg.style.left = '0px';
-    seg.style.width = `${8 * beatUnit}px`;
-    bridgeContainer.appendChild(seg);
+    // Global fallback for initial sync, engine will override with PixiJS drawing
+    return null;
 }
 
 /**
@@ -619,10 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBestScore = document.getElementById('start-best-score');
     if (startBestScore) startBestScore.textContent = highScore;
 
-    // 2. Generate initial spawn platform
-    generateBridge(RHYTHM_CONFIG.BEAT_UNIT);
-
-    // 3. Start Sync Engine
+    // 2. Start Sync Engine (Initializes bridge rendering inside PixiJS)
     window.gameEngine = new SyncEngine();
     
     // 4. Start Inventory Click Selection System
