@@ -572,7 +572,7 @@ class SyncEngine {
     }
     
     checkAudioTriggers() {
-        const audioTriggerX = this.positionX + 200; 
+        const audioTriggerX = this.positionX + 100; 
         const animTriggerX = this.positionX + 100;
         
         for (let i = 0; i < this.segments.length; i++) {
