@@ -637,8 +637,8 @@ body.failed .game-container {
     cursor: pointer;
     /* Can drag again */
     /* Snaps directly inline via flexbox starting from left edge perfectly */
+    height: 100%;
     margin: 0;
-    margin-bottom: 2px;
 }
 
 .bridge-segment .note-block:hover {
